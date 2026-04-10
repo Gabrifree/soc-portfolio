@@ -1,0 +1,278 @@
+{
+  "name": "Wazuh SOAR Pipeline",
+  "nodes": [
+    {
+      "parameters": {
+        "httpMethod": "POST",
+        "path": "wazuh-alert",
+        "options": {},
+        "responseMode": "onReceived"
+      },
+      "id": "webhook-wazuh",
+      "name": "Webhook Wazuh",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 1.1,
+      "position": [240, 400],
+      "webhookId": "wazuh-alert"
+    },
+    {
+      "parameters": {
+        "mode": "rules",
+        "rules": {
+          "values": [
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.rule?.groups?.join(',') || '' }}",
+                    "rightValue": "vulnerability-detector",
+                    "operator": {
+                      "type": "string",
+                      "operation": "notContains"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "Attacchi"
+            },
+            {
+              "conditions": {
+                "options": {
+                  "caseSensitive": true,
+                  "leftValue": "",
+                  "typeValidation": "strict"
+                },
+                "conditions": [
+                  {
+                    "leftValue": "={{ $json.body.rule?.groups?.join(',') || '' }}",
+                    "rightValue": "vulnerability-detector",
+                    "operator": {
+                      "type": "string",
+                      "operation": "contains"
+                    }
+                  },
+                  {
+                    "leftValue": "={{ $json.body.rule?.level || 0 }}",
+                    "rightValue": 10,
+                    "operator": {
+                      "type": "number",
+                      "operation": "gte"
+                    }
+                  }
+                ],
+                "combinator": "and"
+              },
+              "outputKey": "Vulnerabilita"
+            }
+          ]
+        },
+        "options": {
+          "fallbackOutput": "none"
+        }
+      },
+      "id": "switch-router",
+      "name": "Switch",
+      "type": "n8n-nodes-base.switch",
+      "typeVersion": 3,
+      "position": [460, 400]
+    },
+    {
+      "parameters": {
+        "resource": "alert",
+        "operation": "create",
+        "title": "=Wazuh Alert: {{ $json.body.rule.description }}",
+        "description": "=BERSAGLIO DELL'ATTACCO:\nTarget: Proxmox Server\nIP Target: 192.168.173.100\n\nSENSORE DI RILEVAMENTO (Log Collector):\nNome Agente: {{ $json.body.agent.name }}\nIP Agente: {{ $json.body.agent.ip }}\n\nDETTAGLI MINACCIA:\nSeverita: {{ $json.body.rule.level }}\nDescrizione: {{ $json.body.rule.description }}\nMITRE: {{ $json.body.rule.mitre ? $json.body.rule.mitre.id.join(', ') : 'N/A' }}\n\nFULL LOG:\n{{ $json.body.full_log || 'N/A' }}",
+        "type": "external",
+        "source": "wazuh-siem",
+        "sourceRef": "={{ $json.body.id }}",
+        "additionalFields": {
+          "severity": 3,
+          "tlp": 3,
+          "tags": ["wazuh", "automated", "soar"]
+        }
+      },
+      "id": "thehive-create-alert",
+      "name": "Create an alert",
+      "type": "n8n-nodes-base.theHive5",
+      "typeVersion": 1,
+      "position": [680, 280],
+      "credentials": {
+        "theHive5Api": {
+          "id": "thehive-credentials",
+          "name": "TheHive STAGE-SOC"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "fromEmail": "soc@example.com",
+        "toEmail": "analyst@example.com",
+        "subject": "=Allerta SOC: {{ $json.body.rule.description }}",
+        "emailType": "text",
+        "text": "=Rilevato un alert di sicurezza dal SIEM Wazuh.\n\nDescrizione: {{ $json.body.rule.description }}\nLivello Wazuh: {{ $json.body.rule.level }}\nAgente: {{ $json.body.agent.name }}\nIP Sorgente: {{ $json.body.agent.ip || 'N/A' }}\n\nLink al caso TheHive:\nhttp://192.168.173.211:9000/login\n\n---\nThis email was sent automatically with n8n",
+        "options": {}
+      },
+      "id": "send-email",
+      "name": "Send an Email",
+      "type": "n8n-nodes-base.emailSend",
+      "typeVersion": 2,
+      "position": [900, 200],
+      "credentials": {
+        "smtp": {
+          "id": "smtp-credentials",
+          "name": "SMTP SOC"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "={{ $('Webhook Wazuh').item.json.body.rule.level >= 12 ? '🔴' : ($('Webhook Wazuh').item.json.body.rule.level >= 7 ? '🟠' : '🔵') }} <b>ALLERTA SOC: {{ $('Webhook Wazuh').item.json.body.rule.description }}</b>\n\n🛡️ <b>Dettagli Regola:</b>\n• ID: {{ $('Webhook Wazuh').item.json.body.rule.id }}\n• Livello: {{ $('Webhook Wazuh').item.json.body.rule.level }}\n• MITRE: {{ $('Webhook Wazuh').item.json.body.rule.mitre ? $('Webhook Wazuh').item.json.body.rule.mitre.id.join(', ') : 'N/A' }}\n\n💻 <b>Sorgente / Sensore:</b>\n• Agente: {{ $('Webhook Wazuh').item.json.body.agent.name }}\n• IP Agente: {{ $('Webhook Wazuh').item.json.body.agent.ip || 'Sconosciuto' }}\n\n📝 <b>Log Grezzo:</b>\n{{ $('Webhook Wazuh').item.json.body.full_log ? $('Webhook Wazuh').item.json.body.full_log.substring(0, 200) + '...' : 'Nessun log disponibile' }}\n\n🔗 <a href=\"http://192.168.173.211:9000/login\">Apri Caso su TheHive</a>",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "send-telegram-attacchi",
+      "name": "Send a text message",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [900, 360],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-credentials",
+          "name": "Italpol SOC Bot"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "model": "llama3:latest",
+        "messages": {
+          "values": [
+            {
+              "content": "=Sei un analista SOC senior. Ricevi questo alert di vulnerabilita da Wazuh:\n\n{{ JSON.stringify($json.body) }}\n\nRispondi SOLO con:\n1. RISCHIO: spiegazione in 2 righe del pericolo reale\n2. REMEDIATION: il comando esatto da terminale per risolvere\n3. PRIORITA: Critica / Alta / Media\n\nSii conciso e tecnico."
+            }
+          ]
+        },
+        "options": {
+          "temperature": 0.3
+        }
+      },
+      "id": "ollama-analysis",
+      "name": "Message a model",
+      "type": "@n8n/n8n-nodes-langchain.lmChatOllama",
+      "typeVersion": 1,
+      "position": [680, 540],
+      "credentials": {
+        "ollamaApi": {
+          "id": "ollama-credentials",
+          "name": "Ollama Local (VM 108)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "chatId": "={{ $env.TELEGRAM_CHAT_ID }}",
+        "text": "=<b>{{ $('Webhook Wazuh').item.json.body.rule.level >= 12 ? '🔴' : '🟠' }} ALLERTA VULNERABILITA:</b> {{ $('Webhook Wazuh').item.json.body.rule.description }}\n\n🔹 <b>Dettagli Regola:</b>\n• ID: {{ $('Webhook Wazuh').item.json.body.rule.id }}\n• CVE: {{ $('Webhook Wazuh').item.json.body.data?.vulnerability?.cve || 'N/A' }}\n• Severity: {{ $('Webhook Wazuh').item.json.body.data?.vulnerability?.severity || 'N/A' }}\n\n🤖 <b>ANALISI AI (Ollama — Llama 3):</b>\n{{ $json.content }}\n\n🛠️ <b>AZIONE CONSIGLIATA:</b>\nSegui le istruzioni AI per mettere in sicurezza {{ $('Webhook Wazuh').item.json.body.agent.name }}",
+        "additionalFields": {
+          "parse_mode": "HTML",
+          "disable_web_page_preview": true
+        }
+      },
+      "id": "send-telegram-vulnerabilita",
+      "name": "Send a text message2",
+      "type": "n8n-nodes-base.telegram",
+      "typeVersion": 1.1,
+      "position": [900, 540],
+      "credentials": {
+        "telegramApi": {
+          "id": "telegram-credentials",
+          "name": "Italpol SOC Bot"
+        }
+      }
+    }
+  ],
+  "connections": {
+    "Webhook Wazuh": {
+      "main": [
+        [
+          {
+            "node": "Switch",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Switch": {
+      "main": [
+        [
+          {
+            "node": "Create an alert",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Message a model",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Create an alert": {
+      "main": [
+        [
+          {
+            "node": "Send an Email",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Send a text message",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Message a model": {
+      "main": [
+        [
+          {
+            "node": "Send a text message2",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "saveExecutionProgress": true,
+    "saveManualExecutions": true,
+    "saveDataErrorExecution": "all",
+    "saveDataSuccessExecution": "all"
+  },
+  "tags": [
+    {
+      "name": "soar"
+    },
+    {
+      "name": "wazuh"
+    },
+    {
+      "name": "production"
+    }
+  ]
+}

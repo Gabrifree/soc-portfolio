@@ -1,0 +1,94 @@
+<!--
+  ransomware_behavioral.xml
+  Detection comportamentale ransomware su File Server
+  Si basa sull'osservazione di pattern di operazioni FIM, NON su firme.
+
+  Catena di escalation:
+    100041 (creazione)  ─┐
+                         ├── coppia rapida → 100044 (rinomina/cifratura)
+    100043 (cancella)   ─┘
+    100030 (3+ cancellazioni in 60s)  → SOC CRITICAL Lv12
+    100032 (3+ creazioni in 60s)      → SOC CRITICAL Lv12
+    100045 (5+ rinomina in 30s)       → ALERT AVANZATO Lv12
+    100046 (5+ scatti 100045 in 10s)  → ATTACCO DI MASSA Lv15
+-->
+
+<group name="syscheck,projectdata,ransomware,">
+
+  <!-- Operazione CRUD base: creazione file -->
+  <rule id="100041" level="5">
+    <if_sid>554</if_sid>
+    <field name="file">C:\\ProjectData\\</field>
+    <description>FILE SERVER: Creazione file in ProjectData</description>
+    <group>projectdata_file_op,</group>
+  </rule>
+
+  <!-- Operazione CRUD base: modifica file -->
+  <rule id="100042" level="5">
+    <if_sid>550</if_sid>
+    <field name="file">C:\\ProjectData\\</field>
+    <description>FILE SERVER: Modifica file in ProjectData</description>
+    <group>projectdata_file_op,</group>
+  </rule>
+
+  <!-- Operazione CRUD base: cancellazione file -->
+  <rule id="100043" level="7">
+    <if_sid>553</if_sid>
+    <field name="file">C:\\ProjectData\\</field>
+    <description>FILE SERVER: Cancellazione file in ProjectData</description>
+    <group>projectdata_file_op,</group>
+  </rule>
+
+  <!-- Rinomina rapida: una coppia delete+add < 5s sullo stesso path
+       indica rinomina o cambio estensione (tipico ransomware) -->
+  <rule id="100044" level="8" frequency="2" timeframe="5">
+    <if_matched_group>projectdata_file_op</if_matched_group>
+    <same_field>syscheck.path</same_field>
+    <description>FILE SERVER: Rinomina o Modifica Estensione rapida ($(syscheck.path))</description>
+    <group>ransomware_pattern,</group>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+  </rule>
+
+  <!-- Cancellazione massiva: 3+ delete in 60 secondi -->
+  <rule id="100030" level="12" frequency="3" timeframe="60">
+    <if_matched_sid>100043</if_matched_sid>
+    <description>SOC CRITICAL: Cancellazioni multiple in 60s (possibile ransomware)</description>
+    <group>ransomware_critical,pci_dss_10.6.1,</group>
+    <mitre>
+      <id>T1485</id>
+    </mitre>
+  </rule>
+
+  <!-- Creazione massiva: 3+ create in 60 secondi -->
+  <rule id="100032" level="12" frequency="3" timeframe="60">
+    <if_matched_sid>100041</if_matched_sid>
+    <description>SOC CRITICAL: Creazione massiva file in 60s (possibile ransomware)</description>
+    <group>ransomware_critical,pci_dss_10.6.1,</group>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+  </rule>
+
+  <!-- Pattern ransomware avanzato: 5+ rinomina in 30 secondi -->
+  <rule id="100045" level="12" frequency="5" timeframe="30">
+    <if_matched_sid>100044</if_matched_sid>
+    <description>SOC ALERT: Ransomware rilevato (pattern di estensione massiva)</description>
+    <group>ransomware_critical,</group>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+  </rule>
+
+  <!-- ATTACCO DI MASSA: 5 alert 100045 in 10 secondi -->
+  <rule id="100046" level="15" frequency="5" timeframe="10">
+    <if_matched_sid>100045</if_matched_sid>
+    <description>SOC CRITICAL: Attacco di massa in corso (ransomware multi-file)</description>
+    <group>ransomware_critical,</group>
+    <mitre>
+      <id>T1486</id>
+    </mitre>
+  </rule>
+
+</group>

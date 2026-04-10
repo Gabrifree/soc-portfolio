@@ -1,0 +1,55 @@
+<!--
+  proxmox_decoders.xml
+  Decoder personalizzati per i log Proxmox VE generati da pvedaemon.
+
+  PROBLEMA: pvedaemon usa indirizzi IPv4-mapped IPv6 (::ffff:192.168.x.x)
+            che non sono parsati correttamente dai decoder standard Wazuh.
+
+  SOLUZIONE: catena di decoder padre/figlio che estrae l'IP "pulito".
+
+  ATTENZIONE: l'ordine alfabetico dei file decoder e' determinante.
+              Per garantire il caricamento corretto, mettere TUTTI questi
+              decoder in coda al file local_decoder.xml gia' presente
+              nell'installazione standard.
+
+  Esempio di log Proxmox:
+    pvedaemon[1234]: authentication failure; rhost=::ffff:192.168.173.123 user=root@pam msg=...
+-->
+
+<!-- Decoder padre: identifica il programma -->
+<decoder name="proxmox-auth">
+  <prematch>pvedaemon</prematch>
+</decoder>
+
+<!-- Estrazione campi: status (failed/success) e rhost -->
+<decoder name="proxmox-auth-fields">
+  <parent>proxmox-auth</parent>
+  <prematch>authentication </prematch>
+  <regex offset="after_prematch">^(\w+);\s+rhost=::ffff:(\S+)\s+user=(\S+)</regex>
+  <order>status, srcip, user</order>
+</decoder>
+
+<!-- Variante: rhost senza prefisso ::ffff: (compatibilita') -->
+<decoder name="proxmox-auth-fields-plain">
+  <parent>proxmox-auth</parent>
+  <prematch>authentication </prematch>
+  <regex offset="after_prematch">^(\w+);\s+rhost=(\d+\.\d+\.\d+\.\d+)\s+user=(\S+)</regex>
+  <order>status, srcip, user</order>
+</decoder>
+
+<!-- Decoder per task pvedaemon (qmcreate, qmdestroy, vzcreate...) -->
+<decoder name="proxmox-task">
+  <prematch>pvedaemon</prematch>
+</decoder>
+
+<decoder name="proxmox-task-fields">
+  <parent>proxmox-task</parent>
+  <prematch>worker exit code</prematch>
+  <regex>UPID:\S+:(\w+):(\d+):(\S+)@</regex>
+  <order>task, vmid, user</order>
+</decoder>
+
+<!-- Decoder per messaggi syslog Proxmox forwardati via UDP:514 -->
+<decoder name="proxmox-syslog">
+  <program_name>pvedaemon</program_name>
+</decoder>

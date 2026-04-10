@@ -1,0 +1,35 @@
+<!--
+  proxmox_bruteforce.xml
+  Detection brute force su interfaccia HTTPS Proxmox VE (porta 8006).
+
+  I log pvedaemon contengono indirizzi IPv4-mapped IPv6 (::ffff:IP).
+  Il decoder personalizzato proxmox-auth (vedi wazuh-decoders/) estrae l'IP pulito.
+
+  MITRE ATT&CK: T1110 (Brute Force) — tactic Credential Access
+-->
+
+<group name="proxmox,authentication_failed,">
+
+  <!-- Singolo tentativo di login fallito -->
+  <rule id="100015" level="5">
+    <decoded_as>proxmox-auth</decoded_as>
+    <field name="status">failed</field>
+    <description>Proxmox: Login fallito singolo dall'IP $(srcip)</description>
+    <group>authentication_failed,pci_dss_10.2.4,gdpr_IV_35.7.d,</group>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+  <!-- Brute force: 10 fallimenti consecutivi in 2 secondi dallo stesso IP -->
+  <rule id="100501" level="12" frequency="10" timeframe="2">
+    <if_matched_sid>100015</if_matched_sid>
+    <same_source_ip />
+    <description>Proxmox: Possibile Brute Force (10 tentativi in 2s) dall'IP $(srcip)</description>
+    <group>authentication_failures,pci_dss_11.4,gdpr_IV_35.7.d,</group>
+    <mitre>
+      <id>T1110</id>
+    </mitre>
+  </rule>
+
+</group>
