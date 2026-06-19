@@ -147,7 +147,7 @@
       "credentials": {
         "telegramApi": {
           "id": "telegram-credentials",
-          "name": "Italpol SOC Bot"
+          "name": "SOC Telegram Bot"
         }
       }
     },
@@ -194,7 +194,7 @@
       "credentials": {
         "telegramApi": {
           "id": "telegram-credentials",
-          "name": "Italpol SOC Bot"
+          "name": "SOC Telegram Bot"
         }
       }
     }

@@ -1,18 +1,15 @@
 # Screenshots
 
-Aggiungere qui le immagini dei pannelli, workflow e dashboard del laboratorio.
+Immagini dell'infrastruttura SOC operativa. Tutti gli identificativi sensibili (email, ID mailbox) sono stati oscurati; gli IP sono in subnet privata RFC1918.
 
-Suggerimenti per i screenshot più impattanti:
-- `01_proxmox_overview.png` — vista ad albero del datacenter Proxmox con tutti i nodi
-- `02_wazuh_dashboard_agents.png` — i 5 agenti tutti in stato Active
-- `03_grafana_soc_dashboard.png` — la dashboard SOC completa con i 4 quadranti
-- `04_n8n_workflow_final.png` — il workflow SOAR a 7 nodi con le spunte verdi
-- `05_thehive_cases.png` — la lista casi su TheHive con quelli generati automaticamente
-- `06_telegram_alert.png` — l'alert Telegram con emoji ed analisi AI
-- `07_grafana_hardware_gauges.png` — i gauge CPU/RAM/Disco di Proxmox
-
-**Nota privacy:** ricordati di blurare/oscurare:
-- email reali
-- nomi utente reali (se non già anonimizzati)
-- IP pubblici
-- nomi azienda non autorizzati alla pubblicazione
+| File | Contenuto |
+|------|-----------|
+| `01_proxmox_overview.png` | Vista ad albero del datacenter Proxmox con tutti i nodi (VM e container LXC) |
+| `02_wazuh_dashboard_agents.png` | I 5 agenti Wazuh in stato Active (3 Windows + 1 Ubuntu + 1 Debian) |
+| `03_grafana_soc_dashboard.png` | Dashboard SOC su Grafana — monitoraggio VM Proxmox su 7 giorni |
+| `04_n8n_workflow_final.png` | Workflow SOAR n8n pubblicato (Webhook → TheHive) |
+| `05_thehive_cases.png` | Lista casi su TheHive generati automaticamente dal workflow |
+| `06_email_alert.png` | Notifica email automatica generata da n8n (mittente oscurato) |
+| `07_grafana_hardware_gauges.png` | Gauge hardware Proxmox (CPU/RAM/Disco/Uptime) da Prometheus |
+| `08_wazuh_rules.png` | Le 12 regole di correlazione custom nella dashboard Wazuh |
+| `09_wazuh_decoders.png` | I 6 decoder personalizzati per i log Proxmox |
